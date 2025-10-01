@@ -33,7 +33,7 @@ export default function Dashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/steps?hours=24');
+      const response = await fetch('/api/steps');
       const result = await response.json();
       
       if (result.success) {
