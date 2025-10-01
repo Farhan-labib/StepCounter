@@ -10,61 +10,48 @@ import {
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
 } from "chart.js";
-import 'chartjs-adapter-date-fns';
+import "chartjs-adapter-date-fns";
 
 ChartJS.register(TimeScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function Home() {
-  const { data } = useSWR("/api/steps?limit=50", fetcher, { refreshInterval: 5000 });
+  const { data, error } = useSWR("/api/steps?limit=50", fetcher, { refreshInterval: 5000 });
 
-  if (!data) return <div>Loading...</div>;
+  if (error) return <div className="text-center mt-10">Error loading steps</div>;
+  if (!data) return <div className="text-center mt-10">Loading...</div>;
+  if (!Array.isArray(data) || data.length === 0)
+    return <div className="text-center mt-10">No steps data available</div>;
 
   const sorted = data.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  const labels = sorted.map(d => new Date(d.timestamp));
-  const values = sorted.map(d => d.stepCount);
+  const labels = sorted.map((d) => new Date(d.timestamp));
+  const values = sorted.map((d) => d.stepCount);
 
   const chartData = {
     labels,
-    datasets: [{
-      label: "Steps",
-      data: values,
-      borderColor: "blue",
-      fill: false,
-    }]
+    datasets: [
+      {
+        label: "Steps",
+        data: values,
+        borderColor: "blue",
+        fill: false,
+      },
+    ],
   };
 
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: true,
-        text: 'Step Dashboard',
-      },
-    },
-    scales: {
-      x: {
-        type: 'time',  
-        time: {
-          unit: 'day', 
-        },
-      },
-      y: {
-        beginAtZero: true,
-      },
-    },
-  };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStep = data.find((d) => new Date(d.timestamp).setHours(0, 0, 0, 0) === today.getTime());
+  const todaysSteps = todayStep ? todayStep.stepCount : 0;
 
   return (
-    <div style={{ maxWidth: 800, margin: "20px auto" }}>
-      <h1>Step Dashboard</h1>
-      <Line data={chartData} options={chartOptions} />
+    <div className="max-w-xl mx-auto mt-10 px-4">
+      <h1 className="text-2xl font-bold text-center mb-4">Step Dashboard</h1>
+      <p className="text-center text-xl mb-6">Today's Steps: <span className="font-semibold">{todaysSteps}</span></p>
+      <Line data={chartData} />
     </div>
   );
 }
