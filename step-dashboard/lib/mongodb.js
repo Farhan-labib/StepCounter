@@ -3,13 +3,11 @@ import mongoose from "mongoose";
 let isConnected = false;
 
 export async function connectToDatabase() {
-  if (isConnected) return;
-
-  try {
-    await mongoose.connect(process.env.MONGODB_URI, { dbName: "stepdb" });
-    isConnected = true;
-    console.log("MongoDB connected");
-  } catch (err) {
-    console.error("MongoDB connection error:", err);
-  }
+  if (isConnected || mongoose.connection.readyState === 1) return;
+  await mongoose.connect(process.env.MONGODB_URI, {
+    dbName: "stepdb",
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
+  isConnected = true;
 }
