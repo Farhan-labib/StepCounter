@@ -1,4 +1,7 @@
 package com.farhan.stepcounterapp
 
-class StepData {
-}
+data class StepData(
+    val timestamp: Long,
+    val stepCount: Int,
+    val userId: String = "user001"
+)

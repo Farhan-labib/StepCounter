@@ -1,7 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-             android:orientation="vertical"
-             android:layout_width="match_parent"
-             android:layout_height="match_parent">
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:gravity="center">
+
+    <TextView
+        android:id="@+id/tvStepCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Steps: 0"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp"/>
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Status: Waiting..."
+        android:textSize="16sp"
+        android:layout_marginBottom="16dp"/>
+
+    <Button
+        android:id="@+id/btnStartStop"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Start Tracking"
+        android:textSize="18sp"/>
 
 </LinearLayout>
