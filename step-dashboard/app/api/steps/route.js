@@ -13,7 +13,7 @@ export async function POST(request) {
     }
 
     const date = new Date(timestamp);
-    date.setHours(0, 0, 0, 0); // normalize to midnight to match "per day"
+    date.setHours(0, 0, 0, 0); 
 
     const filter = {
       userId: userId || "user001",
@@ -25,7 +25,7 @@ export async function POST(request) {
     };
 
     const options = {
-      upsert: true, // create if not exist
+      upsert: true, 
       new: true
     };
 
