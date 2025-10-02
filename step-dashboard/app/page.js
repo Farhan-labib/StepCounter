@@ -10,48 +10,64 @@ import {
   LineElement,
   Title,
   Tooltip,
-  Legend,
+  Legend
 } from "chart.js";
-import "chartjs-adapter-date-fns";
+import 'chartjs-adapter-date-fns';
 
 ChartJS.register(TimeScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function Home() {
-  const { data, error } = useSWR("/api/steps?limit=50", fetcher, { refreshInterval: 5000 });
+  const { data } = useSWR("/api/steps?limit=50", fetcher, { refreshInterval: 5000 });
 
-  if (error) return <div className="text-center mt-10">Error loading steps</div>;
-  if (!data) return <div className="text-center mt-10">Loading...</div>;
-  if (!Array.isArray(data) || data.length === 0)
-    return <div className="text-center mt-10">No steps data available</div>;
+  if (!data || !data.length) return <div className="flex items-center justify-center h-screen text-gray-500 text-lg">Loading...</div>;
 
   const sorted = data.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  const labels = sorted.map((d) => new Date(d.timestamp));
-  const values = sorted.map((d) => d.stepCount);
+  const labels = sorted.map(d => new Date(d.timestamp));
+  const values = sorted.map(d => d.stepCount);
+
+  const latestStepData = sorted[sorted.length - 1];
+  const todaySteps = latestStepData ? latestStepData.stepCount : 0;
 
   const chartData = {
     labels,
-    datasets: [
-      {
-        label: "Steps",
-        data: values,
-        borderColor: "blue",
-        fill: false,
-      },
-    ],
+    datasets: [{
+      label: "Steps",
+      data: values,
+      borderColor: "#3b82f6",
+      backgroundColor: "#3b82f6",
+      tension: 0.3,
+      fill: false,
+      pointRadius: 4
+    }]
   };
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayStep = data.find((d) => new Date(d.timestamp).setHours(0, 0, 0, 0) === today.getTime());
-  const todaysSteps = todayStep ? todayStep.stepCount : 0;
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: { position: 'top', labels: { font: { size: 14 } } },
+      title: { display: true, text: 'Step Dashboard', font: { size: 26 }, padding: { top: 10, bottom: 20 } },
+      tooltip: { mode: 'index', intersect: false }
+    },
+    scales: {
+      x: { type: 'time', time: { unit: 'day' }, title: { display: true, text: 'Date', font: { size: 16 } } },
+      y: { beginAtZero: true, title: { display: true, text: 'Steps', font: { size: 16 } } }
+    }
+  };
 
   return (
-    <div className="max-w-xl mx-auto mt-10 px-4">
-      <h1 className="text-2xl font-bold text-center mb-4">Step Dashboard</h1>
-      <p className="text-center text-xl mb-6">Today's Steps: <span className="font-semibold">{todaysSteps}</span></p>
-      <Line data={chartData} />
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 px-4">
+      <div className="bg-white p-8 shadow-2xl rounded-3xl flex flex-col items-center w-full max-w-md">
+        <h1 className="text-4xl font-bold text-center mb-6 text-gray-800">Step Dashboard</h1>
+        <div className="text-center mb-6">
+          <span className="text-gray-500 text-xl">Today's Steps:</span>
+          <span className="text-5xl font-extrabold ml-2 text-blue-600">{todaySteps}</span>
+        </div>
+        <div className="w-full max-w-[350px]">
+          <Line data={chartData} options={chartOptions} />
+        </div>
+      </div>
     </div>
   );
 }

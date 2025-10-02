@@ -15,80 +15,59 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 
 class MainActivity : ComponentActivity(), SensorEventListener {
-
 
     private lateinit var tvStepCount: TextView
     private lateinit var tvStatus: TextView
     private lateinit var btnStartStop: Button
-
-
     private lateinit var sensorManager: SensorManager
     private var stepSensor: Sensor? = null
-
-
     private var isTracking = false
     private var currentSteps = 0
     private var initialSteps = -1
-
-
     private lateinit var localStorage: LocalStorage
-
-
     private var uploadJob: Job? = null
 
-
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            Toast.makeText(this, "Permission granted!", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "Permission denied. App won't work properly.", Toast.LENGTH_LONG).show()
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (!isGranted) Toast.makeText(
+                this,
+                "Permission denied. App won't work properly.",
+                Toast.LENGTH_LONG
+            ).show()
         }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-
         tvStepCount = findViewById(R.id.tvStepCount)
         tvStatus = findViewById(R.id.tvStatus)
         btnStartStop = findViewById(R.id.btnStartStop)
-
-
         localStorage = LocalStorage(this)
 
+        val todayData = localStorage.getTodayStep()
+        if (todayData != null) {
+            initialSteps = todayData.initialSteps
+            currentSteps = todayData.stepCount
+        } else {
+            initialSteps = -1
+            currentSteps = 0
+        }
 
+        tvStepCount.text = "Steps: $currentSteps"
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
-
-
         if (stepSensor == null) {
-            tvStatus.text = "Status: Step Counter not available on this device"
+            tvStatus.text = "Step Counter not available on this device"
             btnStartStop.isEnabled = false
             Toast.makeText(this, "Step Counter sensor not found!", Toast.LENGTH_LONG).show()
         }
 
-
         requestActivityRecognitionPermission()
-
-
-        btnStartStop.setOnClickListener {
-            if (isTracking) {
-                stopTracking()
-            } else {
-                startTracking()
-            }
-        }
+        btnStartStop.setOnClickListener { if (isTracking) stopTracking() else startTracking() }
     }
 
     private fun requestActivityRecognitionPermission() {
@@ -106,60 +85,40 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private fun startTracking() {
         if (stepSensor != null) {
             isTracking = true
-            initialSteps = -1
+            val todayData = localStorage.getTodayStep()
+            if (todayData != null) initialSteps = todayData.initialSteps
             btnStartStop.text = "Stop Tracking"
-            tvStatus.text = "Status: Tracking..."
-
-
-            sensorManager.registerListener(
-                this,
-                stepSensor,
-                SensorManager.SENSOR_DELAY_NORMAL
-            )
-
-
+            tvStatus.text = "Tracking..."
+            sensorManager.registerListener(this, stepSensor, SensorManager.SENSOR_DELAY_NORMAL)
             startPeriodicUpload()
-
-            Toast.makeText(this, "Tracking started", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun stopTracking() {
         isTracking = false
         btnStartStop.text = "Start Tracking"
-        tvStatus.text = "Status: Stopped"
-
-
+        tvStatus.text = "Stopped"
         sensorManager.unregisterListener(this)
-
-
         uploadJob?.cancel()
-
-        Toast.makeText(this, "Tracking stopped", Toast.LENGTH_SHORT).show()
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_STEP_COUNTER) {
             val totalSteps = event.values[0].toInt()
-
-
-            if (initialSteps == -1) {
-                initialSteps = totalSteps
-            }
-
-
+            if (initialSteps == -1) initialSteps = totalSteps
             currentSteps = totalSteps - initialSteps
+            runOnUiThread { tvStepCount.text = "Steps: $currentSteps" }
 
-
-            runOnUiThread {
-                tvStepCount.text = "Steps: $currentSteps"
-            }
+            val savedStep = SavedStep(
+                dayStart = System.currentTimeMillis().toDayStart(),
+                initialSteps = initialSteps,
+                stepCount = currentSteps
+            )
+            localStorage.saveStepData(savedStep)
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-
-    }
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     private fun startPeriodicUpload() {
         uploadJob = CoroutineScope(Dispatchers.Main).launch {
@@ -175,26 +134,15 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             timestamp = System.currentTimeMillis(),
             stepCount = currentSteps
         )
-
-
-        localStorage.saveStepData(stepData)
-
-
         withContext(Dispatchers.IO) {
             try {
                 val response = RetrofitClient.apiService.sendStepData(stepData)
-
                 withContext(Dispatchers.Main) {
-                    if (response.isSuccessful) {
-                        tvStatus.text = "Status: Data uploaded ✓"
-                    } else {
-                        tvStatus.text = "Status: Upload failed (saved locally)"
-                    }
+                    tvStatus.text = if (response.isSuccessful) "Data uploaded ✓"
+                    else "Upload failed (saved locally)"
                 }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    tvStatus.text = "Status: No connection (saved locally)"
-                }
+                withContext(Dispatchers.Main) { tvStatus.text = "No connection (saved locally)" }
             }
         }
     }
@@ -206,12 +154,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     }
 
     private fun runOnUiThread(action: () -> Unit) {
-        if (Thread.currentThread() == mainLooper.thread) {
-            action()
-        } else {
-            CoroutineScope(Dispatchers.Main).launch {
-                action()
-            }
-        }
+        if (Thread.currentThread() == mainLooper.thread) action()
+        else CoroutineScope(Dispatchers.Main).launch { action() }
     }
 }
